@@ -40,6 +40,7 @@ Summary:        An Embedded Java Compiler
 License:        BSD-style
 URL:            http://www.janino.net/
 Group:          Development/Java
+BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-buildroot
 Source0:        http://www.janino.net/download/janino-2.5.12.zip
 Source1:        janino-2.5.11.pom
 Patch0:         janino-build_xml.patch
