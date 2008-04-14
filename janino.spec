@@ -33,7 +33,7 @@
 %define section free
 
 Name:           janino
-Version:        2.5.12
+Version:        2.5.13
 Release:        %mkrel 0.0.1
 Epoch:          0
 Summary:        An Embedded Java Compiler
@@ -41,7 +41,7 @@ License:        BSD-style
 URL:            http://www.janino.net/
 Group:          Development/Java
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-buildroot
-Source0:        http://www.janino.net/download/janino-2.5.12.zip
+Source0:        http://www.janino.net/download/%{name}-%{version}.zip
 Source1:        janino-2.5.11.pom
 Patch0:         janino-build_xml.patch
 BuildRequires:  ant
