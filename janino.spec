@@ -27,13 +27,12 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-%define _with_gcj_support 1
-%define gcj_support %{?_with_gcj_support:1}%{!?_with_gcj_support:%{?_without_gcj_support:0}%{!?_without_gcj_support:%{?_gcj_support:%{_gcj_support}}%{!?_gcj_support:0}}}
+%define gcj_support 0
 
 %define section free
 
 Name:           janino
-Version:        2.5.13
+Version:        2.5.15
 Release:        %mkrel 0.0.1
 Epoch:          0
 Summary:        An Embedded Java Compiler
@@ -74,13 +73,6 @@ Group:          Development/Java
 %description    javadoc
 %{summary}.
 
-%package        manual
-Summary:        Documents for %{name}
-Group:          Development/Java
-
-%description    manual
-%{summary}.
-
 %prep
 %setup -q
 %remove_java_binaries
@@ -114,9 +106,7 @@ install -p -d -m 755 $RPM_BUILD_ROOT%{_javadocdir}/%{name}-%{version}
 cp -pr build/javadoc/* $RPM_BUILD_ROOT%{_javadocdir}/%{name}-%{version}
 (cd $RPM_BUILD_ROOT%{_javadocdir} && ln -sf %{name}-%{version} %{name})
 
-%if %{gcj_support}
-%{_bindir}/aot-compile-rpm
-%endif
+%{gcj_compile}
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -138,9 +128,7 @@ rm -rf $RPM_BUILD_ROOT
 %{_javadir}/*.jar
 %{_datadir}/maven2/poms/*
 %{_mavendepmapfragdir}
-%if %{gcj_support}
-%attr(-,root,root) %{_libdir}/gcj/%{name}
-%endif
+%{gcj_files}
 
 %files javadoc
 %defattr(0644,root,root,0755)
