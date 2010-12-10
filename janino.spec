@@ -33,7 +33,7 @@
 
 Name:           janino
 Version:        2.5.15
-Release:        %mkrel 0.0.2
+Release:        %mkrel 0.0.3
 Epoch:          0
 Summary:        An Embedded Java Compiler
 License:        BSD-style
