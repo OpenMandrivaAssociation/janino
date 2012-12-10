@@ -135,3 +135,30 @@ rm -rf $RPM_BUILD_ROOT
 %dir %{_javadocdir}/%{name}-%{version}
 %{_javadocdir}/%{name}-%{version}/*
 %dir %{_javadocdir}/%{name}
+
+
+%changelog
+* Fri Dec 10 2010 Oden Eriksson <oeriksson@mandriva.com> 0:2.5.15-0.0.3mdv2011.0
++ Revision: 619780
+- the mass rebuild of 2010.0 packages
+
+* Fri Sep 04 2009 Thierry Vignaud <tv@mandriva.org> 0:2.5.15-0.0.2mdv2010.0
++ Revision: 429592
+- rebuild
+
+* Wed Jun 25 2008 Alexander Kurtakov <akurtakov@mandriva.org> 0:2.5.15-0.0.1mdv2009.0
++ Revision: 228879
+- new version 2.5.15, disable gcj_compile
+
+* Mon Apr 14 2008 Alexander Kurtakov <akurtakov@mandriva.org> 0:2.5.13-0.0.1mdv2009.0
++ Revision: 193231
+- new version
+
+  + Thierry Vignaud <tv@mandriva.org>
+    - fix no-buildroot-tag
+
+* Fri Jan 25 2008 Alexander Kurtakov <akurtakov@mandriva.org> 0:2.5.12-0.0.1mdv2008.1
++ Revision: 158110
+- import janino
+
+
