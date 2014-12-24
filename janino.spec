@@ -30,7 +30,8 @@
 #
 Name:          janino
 Version:       2.6.1
-Release:       18.1%{?dist}
+Release:       20.1
+Group:		Development/Java
 Summary:       An embedded Java compiler
 License:       BSD
 URL:           http://docs.codehaus.org/display/JANINO/Home
@@ -49,11 +50,10 @@ BuildRequires: codehaus-parent
 BuildRequires: ant
 BuildRequires: junit
 
-BuildRequires: buildnumber-maven-plugin
 BuildRequires: maven-local
 BuildRequires: maven-enforcer-plugin
 BuildRequires: maven-source-plugin
-BuildRequires: maven-surefire-provider-junit4
+BuildRequires: maven-surefire-provider-junit
 
 BuildArch:     noarch
 
@@ -104,6 +104,9 @@ sed -i 's#<target>1.1</target>#<target>1.5</target>#' pom.xml
 %patch0 -p1
 
 perl -pi -e 's/\r$//g' new_bsd_license.txt README.txt
+
+# Cannot run program "svn"
+%pom_remove_plugin :buildnumber-maven-plugin
 
 %build
 
