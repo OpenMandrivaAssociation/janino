@@ -30,7 +30,7 @@
 #
 Name:          janino
 Version:       2.6.1
-Release:       20.2
+Release:       20.3
 Group:		Development/Java
 Summary:       An embedded Java compiler
 License:       BSD
