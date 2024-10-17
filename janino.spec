@@ -34,7 +34,7 @@ Release:       20.3
 Group:		Development/Java
 Summary:       An embedded Java compiler
 License:       BSD
-URL:           http://docs.codehaus.org/display/JANINO/Home
+URL:           https://docs.codehaus.org/display/JANINO/Home
 Source0:       http://dist.codehaus.org/%{name}/%{name}-%{version}.zip
 Source1:       http://repo1.maven.org/maven2/org/codehaus/%{name}/%{name}-parent/%{version}/%{name}-parent-%{version}.pom
 Source2:       http://repo1.maven.org/maven2/org/codehaus/%{name}/commons-compiler/%{version}/commons-compiler-%{version}.pom
