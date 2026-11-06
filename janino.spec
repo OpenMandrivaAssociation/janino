@@ -171,6 +171,12 @@ expected_plugins = {
     "commons-compiler-jdk": {"maven-bundle-plugin"},
     "janino": {"maven-bundle-plugin", "maven-surefire-plugin"},
 }
+# builddep would require the sibling jar before this package exists.
+expected_reactor = {
+    "commons-compiler": 0,
+    "commons-compiler-jdk": 1,
+    "janino": 1,
+}
 for name, dep_count in expected_deps.items():
     path = Path(name) / "pom.xml"
     tree = ET.parse(path)
@@ -211,14 +217,28 @@ for name, dep_count in expected_deps.items():
         root.remove(build)
     if find_child(root, "profiles") is not None:
         root.remove(find_child(root, "profiles"))
+    marked = 0
+    for child in kids(find_child(root, "dependencies")):
+        if local(child.tag) != "dependency":
+            continue
+        group_el = find_child(child, "groupId")
+        group = (group_el.text or "").strip() if group_el is not None else ""
+        if group != "org.codehaus.janino":
+            continue
+        opt = find_child(child, "optional")
+        if opt is None:
+            opt = ET.SubElement(child, q(child, "optional"))
+        opt.text = "true"
+        marked += 1
     if (
         removed_deps != dep_count
         or removed_plugins != expected_plugins[name]
+        or marked != expected_reactor[name]
         or (relative.text or "").strip() != ".."
         or find_child(root, "profiles") is not None
     ):
         raise SystemExit(
-            f"{name} deps={removed_deps} plugins={removed_plugins} "
+            f"{name} deps={removed_deps} plugins={removed_plugins} marked={marked} "
             f"rel={(relative.text or '').strip()}"
         )
     tree.write(path, encoding="UTF-8", xml_declaration=True)
@@ -229,6 +249,47 @@ if Path("janino/src/main/java/org/codehaus/janino/AntCompilerAdapter.java").exis
     raise SystemExit("Ant adapter remains")
 if list(Path(".").rglob("*.jar")):
     raise SystemExit("prebuilt jar remains")
+PY
+
+# generate_buildrequires already ran. Put the reactor dependencies back
+# so Maven compiles against them and the installed POM requires them.
+%build -p
+python - <<'PY'
+import xml.etree.ElementTree as ET
+from pathlib import Path
+
+ET.register_namespace("", "http://maven.apache.org/POM/4.0.0")
+ET.register_namespace("xsi", "http://www.w3.org/2001/XMLSchema-instance")
+
+def local(tag):
+    return tag.rsplit("}", 1)[-1]
+
+cleared = 0
+for path in (Path("commons-compiler-jdk/pom.xml"), Path("janino/pom.xml")):
+    tree = ET.parse(path)
+    root = tree.getroot()
+    deps = None
+    for child in root:
+        if local(child.tag) == "dependencies":
+            deps = child
+    if deps is None:
+        raise SystemExit("dependencies missing in " + path.name)
+    for child in list(deps):
+        if local(child.tag) != "dependency":
+            continue
+        group = ""
+        for item in child:
+            if local(item.tag) == "groupId":
+                group = (item.text or "").strip()
+        if group != "org.codehaus.janino":
+            continue
+        for item in list(child):
+            if local(item.tag) == "optional":
+                child.remove(item)
+                cleared += 1
+    tree.write(path, encoding="UTF-8", xml_declaration=True)
+if cleared != 2:
+    raise SystemExit("cleared " + str(cleared))
 PY
 
 %files -f .mfiles
