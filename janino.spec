@@ -1,195 +1,235 @@
-%{?_javapackages_macros:%_javapackages_macros}
-# Copyright (c) 2000-2007, JPackage Project
-# All rights reserved.
-#
-# Redistribution and use in source and binary forms, with or without
-# modification, are permitted provided that the following conditions
-# are met:
-#
-# 1. Redistributions of source code must retain the above copyright
-#    notice, this list of conditions and the following disclaimer.
-# 2. Redistributions in binary form must reproduce the above copyright
-#    notice, this list of conditions and the following disclaimer in the
-#    documentation and/or other materials provided with the
-#    distribution.
-# 3. Neither the name of the JPackage Project nor the names of its
-#    contributors may be used to endorse or promote products derived
-#    from this software without specific prior written permission.
-#
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-# A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-# OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-# SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-# LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-# DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-# THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-#
-Name:          janino
-Version:       2.6.1
-Release:       20.3
+Name:		janino
+Version:	3.1.12
+Release:	1
+Summary:	Embedded Java compiler
 Group:		Development/Java
-Summary:       An embedded Java compiler
-License:       BSD
-URL:           https://docs.codehaus.org/display/JANINO/Home
-Source0:       http://dist.codehaus.org/%{name}/%{name}-%{version}.zip
-Source1:       http://repo1.maven.org/maven2/org/codehaus/%{name}/%{name}-parent/%{version}/%{name}-parent-%{version}.pom
-Source2:       http://repo1.maven.org/maven2/org/codehaus/%{name}/commons-compiler/%{version}/commons-compiler-%{version}.pom
-Source3:       http://repo1.maven.org/maven2/org/codehaus/%{name}/commons-compiler-jdk/%{version}/commons-compiler-jdk-%{version}.pom
-Source4:       http://repo1.maven.org/maven2/org/codehaus/%{name}/%{name}/%{version}/%{name}-%{version}.pom
-# remove org.codehaus.mojo findbugs-maven-plugin 1.1.1, javancss-maven-plugin 2.0, jdepend-maven-plugin 2.0-beta-2
-# change artifactId ant-nodeps in ant
-Patch0:        %{name}-%{version}-poms.patch
+License:	BSD
+URL:		https://github.com/janino-compiler/janino
+Source0:	https://github.com/janino-compiler/janino/archive/refs/tags/v%{version}.tar.gz#/janino-%{version}.tar.gz
 
-BuildRequires: java-devel >= 1:1.6.0
-BuildRequires: codehaus-parent
-
-BuildRequires: ant
-BuildRequires: junit
-
-BuildRequires: maven-local
-BuildRequires: maven-enforcer-plugin
-BuildRequires: maven-source-plugin
-BuildRequires: maven-surefire-provider-junit
-
-BuildArch:     noarch
+BuildArch:	noarch
+# Literal, so the first rpmbuild -bs records them before sysjar is installed.
+BuildRequires:	maven
+BuildRequires:	java-current-devel
+BuildSystem:	maven
+Obsoletes:	janino-javadoc < %{version}
 
 %description
-Janino is a super-small, super-fast Java compiler. Not only can it compile
-a set of source files to a set of class files like the JAVAC tool, but also
-can it compile a Java expression, block, class body or source file in
-memory, load the bytecode and execute it directly in the same JVM. Janino
-is not intended to be a development tool, but an embedded compiler for
-run-time compilation purposes, e.g. expression evaluators or "server pages"
-engines like JSP.
-
-%package javadoc
-Summary:       Javadoc for %{name}
-
-%description javadoc
-This package contains javadoc for %{name}.
+Janino compiles expressions, scripts, class bodies and source files in
+memory. 3.1.12 is the last release. This package ships janino, the
+commons-compiler API, and the JDK javax.tools implementation. The
+optional Ant adapter is omitted: the system Ant package has no Maven
+coordinate. Tests are skipped.
 
 %prep
-%setup -q
+%autosetup -n janino-%{version}
+# The reactor POM lives in a subdirectory and points at modules with
+# "../". The bundled Ant jar is a prebuilt binary, and AntCompilerAdapter
+# is the only class that imports it.
+rm -f janino/lib/ant-1.7.1.jar
+rm -f janino/src/main/java/org/codehaus/janino/AntCompilerAdapter.java
+python - <<'PY'
+import xml.etree.ElementTree as ET
+from pathlib import Path
 
-find . -name "*.jar" -delete
-find . -name "*.class" -delete
+ET.register_namespace("", "http://maven.apache.org/POM/4.0.0")
+ET.register_namespace("xsi", "http://www.w3.org/2001/XMLSchema-instance")
 
-for m in commons-compiler \
-  commons-compiler-jdk \
-  %{name};do
-  mkdir -p ${m}/src
-  (
-    cd ${m}/src/
-    unzip -qq  ../../${m}-src.zip
-    if [ -f org.codehaus.commons.compiler.properties ]; then
-      mkdir -p main/resources
-      mv org.codehaus.commons.compiler.properties main/resources
-    fi
-  )
-done
+def local(tag):
+    return tag.rsplit("}", 1)[-1]
 
-cp -p %{SOURCE1} pom.xml
-cp -p %{SOURCE2} commons-compiler/pom.xml
-cp -p %{SOURCE3} commons-compiler-jdk/pom.xml
-cp -p %{SOURCE4} %{name}/pom.xml
+def q(parent, name):
+    if parent.tag.startswith("{"):
+        return parent.tag.split("}", 1)[0] + "}" + name
+    return name
 
-# RHBZ #842604
-sed -i 's#<source>1.2</source>#<source>1.5</source>#' pom.xml
-sed -i 's#<target>1.1</target>#<target>1.5</target>#' pom.xml
+def find_child(elem, name):
+    if elem is None:
+        return None
+    for child in elem:
+        if local(child.tag) == name:
+            return child
+    return None
 
-%patch0 -p1
+def artifact_of(elem):
+    found = find_child(elem, "artifactId")
+    return (found.text or "").strip() if found is not None else ""
 
-perl -pi -e 's/\r$//g' new_bsd_license.txt README.txt
+def kids(elem):
+    if elem is None:
+        return []
+    return list(elem)
 
-# Cannot run program "svn"
-%pom_remove_plugin :buildnumber-maven-plugin
+drop_plugins = {
+    "maven-surefire-plugin",
+    "maven-bundle-plugin",
+    "maven-jarsigner-plugin",
+    "maven-javadoc-plugin",
+    "maven-source-plugin",
+    "nexus-staging-maven-plugin",
+}
 
-%build
+parent_path = Path("janino-parent/pom.xml")
+tree = ET.parse(parent_path)
+root = tree.getroot()
+props = find_child(root, "properties")
+if props is None:
+    raise SystemExit("properties missing")
+removed_props = []
+for child in list(props):
+    name = local(child.tag)
+    if name in {"maven.compiler.executable", "maven.compiler.fork"}:
+        props.remove(child)
+        removed_props.append(name)
+source = find_child(props, "maven.compiler.source")
+target = find_child(props, "maven.compiler.target")
+if source is None or target is None:
+    raise SystemExit("compiler source or target missing")
+if (source.text or "").strip() != "1.7" or (target.text or "").strip() != "1.7":
+    raise SystemExit("compiler level is not 1.7")
+if find_child(props, "maven.compiler.release") is not None:
+    raise SystemExit("compiler release must stay unset")
 
-%mvn_build
+modules = find_child(root, "modules")
+if modules is None:
+    raise SystemExit("modules missing")
+for child in list(modules):
+    modules.remove(child)
+for name in ("commons-compiler", "commons-compiler-jdk", "janino"):
+    elem = ET.Element(q(modules, "module"))
+    elem.text = name
+    modules.append(elem)
 
-%install
-%mvn_install
+build = find_child(root, "build")
+plugins = find_child(build, "plugins")
+if plugins is None:
+    raise SystemExit("plugins missing")
+removed = []
+for child in list(plugins):
+    if local(child.tag) != "plugin":
+        continue
+    art = artifact_of(child)
+    if art in drop_plugins:
+        plugins.remove(child)
+        removed.append(art)
+        continue
+    if art in {"maven-jar-plugin", "maven-compiler-plugin"}:
+        for item in list(child):
+            if local(item.tag) == "version":
+                child.remove(item)
+    if art == "maven-jar-plugin":
+        conf = find_child(child, "configuration")
+        archive = find_child(conf, "archive")
+        for item in kids(archive):
+            if local(item.tag) == "manifestFile":
+                archive.remove(item)
+management = find_child(build, "pluginManagement")
+if management is not None:
+    build.remove(management)
+if find_child(root, "profiles") is not None:
+    root.remove(find_child(root, "profiles"))
+
+def plugin_named(parent, art):
+    box = find_child(parent, "plugins")
+    for child in kids(box):
+        if artifact_of(child) == art:
+            return child
+    return None
+
+def has_named(elem, name):
+    return any(local(item.tag) == name for item in kids(elem))
+
+jar = plugin_named(build, "maven-jar-plugin")
+compiler = plugin_named(build, "maven-compiler-plugin")
+if (
+    set(removed) != drop_plugins
+    or set(removed_props) != {"maven.compiler.executable", "maven.compiler.fork"}
+    or jar is None
+    or compiler is None
+    or has_named(jar, "version")
+    or has_named(compiler, "version")
+    or has_named(find_child(find_child(jar, "configuration"), "archive"), "manifestFile")
+    or [((child.text or "").strip()) for child in modules]
+    != ["commons-compiler", "commons-compiler-jdk", "janino"]
+    or find_child(build, "pluginManagement") is not None
+    or find_child(root, "profiles") is not None
+):
+    raise SystemExit(
+        f"parent props={removed_props} removed={removed} modules="
+        f"{[ (c.text or '').strip() for c in modules ]}"
+    )
+tree.write(Path("pom.xml"), encoding="UTF-8", xml_declaration=True)
+parent_path.unlink()
+
+expected_deps = {
+    "commons-compiler": 1,
+    "commons-compiler-jdk": 0,
+    "janino": 3,
+}
+expected_plugins = {
+    "commons-compiler": {"maven-bundle-plugin"},
+    "commons-compiler-jdk": {"maven-bundle-plugin"},
+    "janino": {"maven-bundle-plugin", "maven-surefire-plugin"},
+}
+for name, dep_count in expected_deps.items():
+    path = Path(name) / "pom.xml"
+    tree = ET.parse(path)
+    root = tree.getroot()
+    parent = find_child(root, "parent")
+    relative = find_child(parent, "relativePath")
+    if relative is None:
+        raise SystemExit(f"{name} relativePath missing")
+    relative.text = ".."
+    deps = find_child(root, "dependencies")
+    removed_deps = 0
+    for child in kids(deps):
+        if local(child.tag) != "dependency":
+            continue
+        group_el = find_child(child, "groupId")
+        group = (group_el.text or "").strip() if group_el is not None else ""
+        art = artifact_of(child)
+        scope_el = find_child(child, "scope")
+        scope = (scope_el.text or "").strip() if scope_el is not None else ""
+        if scope == "test" or (group == "org.apache.ant" and art == "ant"):
+            deps.remove(child)
+            removed_deps += 1
+    if deps is not None and not list(deps):
+        root.remove(deps)
+    build = find_child(root, "build")
+    plugins = find_child(build, "plugins")
+    removed_plugins = set()
+    for child in kids(plugins):
+        if local(child.tag) != "plugin":
+            continue
+        art = artifact_of(child)
+        if art in {"maven-bundle-plugin", "maven-surefire-plugin"}:
+            plugins.remove(child)
+            removed_plugins.add(art)
+    if plugins is not None and not list(plugins):
+        build.remove(plugins)
+    if build is not None and not list(build):
+        root.remove(build)
+    if find_child(root, "profiles") is not None:
+        root.remove(find_child(root, "profiles"))
+    if (
+        removed_deps != dep_count
+        or removed_plugins != expected_plugins[name]
+        or (relative.text or "").strip() != ".."
+        or find_child(root, "profiles") is not None
+    ):
+        raise SystemExit(
+            f"{name} deps={removed_deps} plugins={removed_plugins} "
+            f"rel={(relative.text or '').strip()}"
+        )
+    tree.write(path, encoding="UTF-8", xml_declaration=True)
+
+if Path("janino-parent/pom.xml").exists() or not Path("pom.xml").is_file():
+    raise SystemExit("reactor pom was not moved")
+if Path("janino/src/main/java/org/codehaus/janino/AntCompilerAdapter.java").exists():
+    raise SystemExit("Ant adapter remains")
+if list(Path(".").rglob("*.jar")):
+    raise SystemExit("prebuilt jar remains")
+PY
 
 %files -f .mfiles
-%dir %{_javadir}/%{name}
-%doc new_bsd_license.txt README.txt
-
-%files javadoc -f .mfiles-javadoc
-%doc new_bsd_license.txt
-
-%changelog
-* Sat Aug 03 2013 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 2.6.1-18
-- Rebuilt for https://fedoraproject.org/wiki/Fedora_20_Mass_Rebuild
-
-* Wed Jul 10 2013 gil cattaneo <puntogil@libero.it> 2.6.1-17
-- switch to XMvn
-- minor changes to adapt to current guideline
-
-* Thu Feb 14 2013 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 2.6.1-16
-- Rebuilt for https://fedoraproject.org/wiki/Fedora_19_Mass_Rebuild
-
-* Wed Feb 06 2013 Java SIG <java-devel@lists.fedoraproject.org> - 2.6.1-15
-- Update for https://fedoraproject.org/wiki/Fedora_19_Maven_Rebuild
-- Replace maven BuildRequires with maven-local
-
-* Tue Jul 24 2012 gil cattaneo <puntogil@libero.it> 2.6.1-14
-- Rebuilt RHBZ #842604 (compile with -target 1.5 or greater)
-
-* Thu Jul 19 2012 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 2.6.1-13
-- Rebuilt for https://fedoraproject.org/wiki/Fedora_18_Mass_Rebuild
-
-* Tue May 08 2012 gil cattaneo <puntogil@libero.it> 2.6.1-12
-- add codehaus-parent to BR
-
-* Thu Apr 19 2012 gil cattaneo <puntogil@libero.it> 2.6.1-11
-- Remove janino-parent as a BuildRequirement
-
-* Wed Apr 18 2012 gil cattaneo <puntogil@libero.it> 2.6.1-10
-- moved all of the jar files into janino subdirectory
-
-* Wed Apr 18 2012 gil cattaneo <puntogil@libero.it> 2.6.1-9
-- merged commons-compiler, commons-compiler-jdk and janino-parent in main package
-
-* Wed Apr 18 2012 gil cattaneo <puntogil@libero.it> 2.6.1-8
-- add janino-parent
-
-* Mon Apr 16 2012 gil cattaneo <puntogil@libero.it> 2.6.1-7
-- Remove commons-compiler as a BuildRequirement
-- Add janino-parent as a Requirement
-
-* Fri Apr 13 2012 gil cattaneo <puntogil@libero.it> 2.6.1-6
-- removed BR unzip
-
-* Fri Apr 13 2012 gil cattaneo <puntogil@libero.it> 2.6.1-5
-- commons-compiler spec file merged
-
-* Fri Apr 13 2012 gil cattaneo <puntogil@libero.it> 2.6.1-4
-- added missing BR maven-surefire-provider-junit4 for prevent mock build failure
-
-* Tue Apr 10 2012 gil cattaneo <puntogil@libero.it> 2.6.1-3
-- removed janino-parent commons-compiler modules.
-
-* Sun Mar 25 2012 gil cattaneo <puntogil@libero.it> 2.6.1-2
-- janino janino-parent commons-compiler spec file merged
-
-* Tue Mar 20 2012 Mary Ellen Foster <mefoster at gmail.com> - 2.6.1-1
-- Update to 2.6.1, with new build system and all
-- Prepare for re-review
-
-* Wed Feb 09 2011 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 2.5.15-4
-- Rebuilt for https://fedoraproject.org/wiki/Fedora_15_Mass_Rebuild
-
-* Tue Oct 27 2009 Mary Ellen Foster <mefoster at gmail.com> - 2.5.15-3
-- Changed group tag on main package and sub-package
-- Fixed default attribute on files section
-
-* Mon Oct 26 2009 Mary Ellen Foster <mefoster at gmail.com> - 2.5.15-2
-- Removed gcj bits
-
-* Sun Oct 25 2009 Mary Ellen Foster <mefoster at gmail.com> - 2.5.15-1
-- Initial package, based on Alexander Kurtakov's JPackage and Mandriva package
+%doc LICENSE README.md
